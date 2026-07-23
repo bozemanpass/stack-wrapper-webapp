@@ -1,0 +1,7 @@
+wrapper:
+  name: webapp
+  description: Generic node.js webapp (React, vite, static site generators, etc.)
+  base-container: bozemanpass/webapp-base
+  containerfile: Containerfile.webapp
+  port: 80
+  default: true

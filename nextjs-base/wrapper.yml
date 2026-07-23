@@ -1,0 +1,8 @@
+wrapper:
+  name: nextjs
+  description: Next.js webapp with runtime environment variable support
+  base-container: bozemanpass/nextjs-base
+  containerfile: Containerfile.webapp
+  port: 80
+  detect:
+    package-json-dependency: next
