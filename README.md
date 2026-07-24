@@ -17,5 +17,5 @@ The wrapper is auto-detected from the app source (a `next` dependency in `packag
 selects `nextjs`); select explicitly with `--wrapper webapp` or `--wrapper nextjs`.
 
 Each wrapper directory contains a `wrapper.yml` manifest (see the stack tool's
-`docs/webapp.md`), the base image `Containerfile`, the app-image `Containerfile.webapp`,
+`docs/wrappers.md`), the base image `Containerfile`, the app-image `Containerfile.webapp`,
 the `build.sh` build script, and the runtime scripts baked into the base image.
