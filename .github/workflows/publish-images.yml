@@ -3,7 +3,7 @@ name: Publish Base Container Images
 on:
   push:
     branches:
-      - main
+      - '*'
 
 jobs:
   build:
