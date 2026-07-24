@@ -3,7 +3,7 @@ name: Publish Base Container Images
 on:
   push:
     branches:
-      - '*'
+      - '**'
 
 jobs:
   build:
@@ -19,11 +19,11 @@ jobs:
             dir: nextjs-base
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Generate container image metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: |
             ghcr.io/${{ matrix.image }}
@@ -33,14 +33,14 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Log in to Container Image Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.dir }}
           file: ${{ matrix.dir }}/Containerfile
