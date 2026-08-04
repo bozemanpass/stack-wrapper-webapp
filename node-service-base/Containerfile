@@ -1,0 +1,46 @@
+# Base image for the 'node-service' wrapper: a long-running node.js service.
+#
+# Unlike webapp-base, nothing here serves static files -- the application process
+# itself is the server, so the base carries only a node runtime, the package
+# managers needed to install and build, and the wrapper's scripts.
+ARG VARIANT=22-bookworm-slim
+FROM node:${VARIANT}
+
+ARG USERNAME=node
+ARG NPM_GLOBAL=/usr/local/share/npm-global
+
+# Add NPM global to PATH.
+ENV PATH=${NPM_GLOBAL}/bin:${PATH}
+# Prevents npm from printing version warnings
+ENV NPM_CONFIG_UPDATE_NOTIFIER=false
+
+RUN \
+    # Configure global npm install location, use group to adapt to UID/GID changes
+    if ! cat /etc/group | grep -e "^npm:" > /dev/null 2>&1; then groupadd -r npm; fi \
+    && usermod -a -G npm ${USERNAME} \
+    && umask 0002 \
+    && mkdir -p ${NPM_GLOBAL} \
+    && touch /usr/local/etc/npmrc \
+    && chown ${USERNAME}:npm ${NPM_GLOBAL} /usr/local/etc/npmrc \
+    && chmod g+s ${NPM_GLOBAL} \
+    && npm config -g set prefix ${NPM_GLOBAL} \
+    && su ${USERNAME} -c "npm config -g set prefix ${NPM_GLOBAL}" \
+    # Install pnpm
+    && su ${USERNAME} -c "umask 0002 && npm install -g pnpm" \
+    # Install bun
+    && su ${USERNAME} -c "umask 0002 && npm install -g bun@1.1.x" \
+    && npm cache clean --force > /dev/null 2>&1
+
+# jq is used to inspect package.json; procps for signal handling/debugging.
+RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
+    && apt-get -y install --no-install-recommends jq procps \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY scripts /scripts
+
+# The port the service is expected to listen on.  Apps that read PORT (the node
+# convention) need no change; others can be pointed at STACK_LISTEN_PORT.
+ENV PORT=3000
+EXPOSE 3000
+
+ENTRYPOINT ["/scripts/start-service.sh"]
