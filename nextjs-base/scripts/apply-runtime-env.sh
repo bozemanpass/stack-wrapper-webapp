@@ -38,7 +38,9 @@ if [ -f ".env" ]; then
 fi
 
 for f in $(find . -type f \( -regex '.*.html?' -or -regex ".*.[tj]s\(x\|on\)?$" \) | grep -v 'node_modules' | grep -v '.git'); do
-  for e in $(cat "${f}" | tr -s '[:blank:]' '\n' | tr -s '["/\\{},();]' '\n' | tr -s "[']" '\n' | egrep -o -e '^STACK_RUNTIME_ENV_.+$' -e '^STACK_HOSTED_CONFIG_.+$'); do
+  # Backticks are delimiters too: esbuild-based bundlers (vite) will happily emit
+  # a placeholder as a template literal, e.g. var a=`STACK_RUNTIME_ENV_API_URL`.
+  for e in $(cat "${f}" | tr -s '[:blank:]' '\n' | tr -s '["/\\{},();`]' '\n' | tr -s "[']" '\n' | egrep -o -e '^STACK_RUNTIME_ENV_.+$' -e '^STACK_HOSTED_CONFIG_.+$'); do
     orig_name=$(echo -n "${e}" | sed 's/"//g')
     cur_name=$(echo -n "${orig_name}" | sed 's/STACK_RUNTIME_ENV_//g')
     cur_val=$(echo -n "\$${cur_name}" | envsubst)
