@@ -1,0 +1,17 @@
+# Wraps a node.js service's source into a runnable image.
+#
+# Two stages so that the build context's cruft (.git, CI config) and any
+# devDependencies left behind by a partial prune do not reach the final image.
+FROM bozemanpass/node-service-base:stack AS builder
+
+ARG STACK_BUILD_TOOL
+ARG STACK_SKIP_PRUNE
+
+WORKDIR /app
+COPY . .
+RUN rm -rf node_modules .git .github
+RUN /scripts/build-app.sh /app
+
+FROM bozemanpass/node-service-base:stack
+WORKDIR /app
+COPY --from=builder /app /app

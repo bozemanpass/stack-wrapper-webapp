@@ -1,0 +1,13 @@
+wrapper:
+  # Short name, used to select the wrapper.
+  name: node-service
+  description: Long-running node.js service (Express, Fastify, etc.)
+  base-container: bozemanpass/node-service-base
+  containerfile: Containerfile.service
+  # Node's conventional port.  The base image exports PORT (and STACK_LISTEN_PORT)
+  # so an app that honors either binds here without any app-side change.
+  port: 3000
+  # An app that depends on express is a service, not a webapp.  Apps that use a
+  # different framework should name the wrapper explicitly.
+  detect:
+    package-json-dependency: express

@@ -17,6 +17,8 @@ jobs:
             dir: webapp-base
           - image: bozemanpass/nextjs-base
             dir: nextjs-base
+          - image: bozemanpass/node-service-base
+            dir: node-service-base
     steps:
       - name: Checkout
         uses: actions/checkout@v5
