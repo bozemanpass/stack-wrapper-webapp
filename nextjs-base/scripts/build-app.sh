@@ -111,9 +111,9 @@ const __xPWA__ = (p) => {
   return (nextConfig) => {
     const modConfig = {...nextConfig};
 
-    modConfig.webpack = (config) => {
+    modConfig.webpack = (config, ...rest) => {
       config.plugins.push(new webpack.DefinePlugin(envMap));
-      return nextConfig.webpack ? nextConfig.webpack(config) : config;
+      return nextConfig.webpack ? nextConfig.webpack(config, ...rest) : config;
     };
 
     return realPWA(modConfig);
@@ -125,9 +125,9 @@ EOF
 const __xPWA__ = (nextConfig) => {
   const modConfig = {...nextConfig};
 
-  modConfig.webpack = (config) => {
+  modConfig.webpack = (config, ...rest) => {
     config.plugins.push(new webpack.DefinePlugin(envMap));
-    return nextConfig.webpack ? nextConfig.webpack(config) : config;
+    return nextConfig.webpack ? nextConfig.webpack(config, ...rest) : config;
   };
 
   return withPWA(modConfig);
@@ -141,9 +141,9 @@ else
   const __xCfg__ = (nextConfig) => {
     const modConfig = {...nextConfig};
 
-    modConfig.webpack = (config) => {
+    modConfig.webpack = (config, ...rest) => {
       config.plugins.push(new webpack.DefinePlugin(envMap));
-      return nextConfig.webpack ? nextConfig.webpack(config) : config;
+      return nextConfig.webpack ? nextConfig.webpack(config, ...rest) : config;
     };
 
     return modConfig;
@@ -208,8 +208,13 @@ CUR_NEXT_VERSION=`jq -r '.version' node_modules/next/package.json`
 semver -p -r ">=14.2.0" "$CUR_NEXT_VERSION"
 if [ $? -eq 0 ]; then
   # For >= 14.2.0
-  STACK_NEXT_COMPILE_COMMAND="next build --experimental-build-mode compile"
-  STACK_NEXT_GENERATE_COMMAND="next build --experimental-build-mode generate"
+  STACK_NEXT_BUNDLER_ARG=""
+  # Next.js >= 16 defaults to Turbopack and errors out when a webpack config is
+  # present without an explicit bundler flag.  The runtime env substitution above
+  # (and any PWA plugin) needs webpack, so ask for it explicitly.
+  semver -p -r ">=16.0.0" "$CUR_NEXT_VERSION" && STACK_NEXT_BUNDLER_ARG="--webpack"
+  STACK_NEXT_COMPILE_COMMAND="next build $STACK_NEXT_BUNDLER_ARG --experimental-build-mode compile"
+  STACK_NEXT_GENERATE_COMMAND="next build $STACK_NEXT_BUNDLER_ARG --experimental-build-mode generate"
 else
   # For 13.4.2 to 14.1.x
   STACK_NEXT_COMPILE_COMMAND="next experimental-compile"
