@@ -1,0 +1,130 @@
+name: Wrapper Test
+
+# Build real applications with the wrappers in this branch.
+#
+# The images here are consumed by the stack tool, which resolves a base image by
+# this repository's commit hash -- so anything pushed to any branch is reachable
+# by a consumer, and publish-images.yml pushes on every branch.  Until now
+# nothing stood between a change here and the applications it builds.
+#
+# nextjs-base is covered by running the stack tool's own webapp test against
+# this checkout: it already asserts what a wrapper has to get right -- that the
+# app builds, that the container serves it, and that configuration supplied at
+# container start reaches the running application.
+#
+# webapp-base has no test in stack's suite (the static-content wrapper lives in
+# its own repository and is based on nginx, not on this image), so it is covered
+# here directly, by building a real vite application with it.
+
+on:
+  pull_request:
+    branches:
+      - '*'
+  push:
+    branches:
+      - '*'
+  schedule:
+    # Run weekly on Monday at 07:30 UTC.  As with stack's copies of these tests,
+    # a wrapper can start failing with no commit here: the base images install
+    # their tooling from package registries at build time, and that is exactly
+    # how these images came to be a node release behind.
+    - cron: "30 7 * * 1"
+  workflow_dispatch:
+
+jobs:
+  nextjs-base:
+    name: "Run stack's webapp test against this wrapper"
+    runs-on: ubuntu-24.04
+    steps:
+      - name: "Clone this repository"
+        uses: actions/checkout@v5
+        with:
+          path: wrapper
+
+      - name: "Clone the stack repository"
+        uses: actions/checkout@v5
+        with:
+          repository: bozemanpass/stack
+          path: stack
+
+      - name: "Install uv"
+        uses: astral-sh/setup-uv@v8.2.0
+        with:
+          python-version: '3.12'
+      - name: "Generate build version file"
+        working-directory: stack
+        run: ./scripts/create_build_tag_file.sh
+      - name: "Build local shiv package"
+        working-directory: stack
+        run: ./scripts/build_shiv_package.sh
+
+      - name: "Run stack's webapp test against this checkout"
+        working-directory: stack
+        env:
+          # Copied into the test's repo base dir, where stack finds wrappers by
+          # searching for a wrapper.yml.
+          STACK_TEST_WRAPPER_DIR: ${{ github.workspace }}/wrapper
+          STACK_SCRIPT_DEBUG: ${{ runner.debug }}
+        run: ./tests/webapp-test/run-webapp-test.sh
+
+  webapp-base:
+    name: "Build a vite app with this wrapper"
+    runs-on: ubuntu-24.04
+    steps:
+      - name: "Clone this repository"
+        uses: actions/checkout@v5
+        with:
+          path: wrapper
+
+      # A real application built by the generic wrapper.  webapp-base is the
+      # default wrapper -- it is what anything without a framework-specific
+      # wrapper gets -- so the app only has to be a normal node build.  This one
+      # has no "next" dependency, so detection picks this image.
+      - name: "Clone an application to build"
+        uses: actions/checkout@v5
+        with:
+          repository: bozemanpass/example-todo-list
+          path: app
+
+      # A released stack, rather than one built from source: this job tests the
+      # wrapper, and the tool is just how the wrapper gets invoked.
+      - name: "Install stack"
+        run: |
+          mkdir -p $HOME/bin
+          curl -L -o $HOME/bin/stack https://github.com/bozemanpass/stack/releases/latest/download/stack
+          chmod +x $HOME/bin/stack
+          echo "$HOME/bin" >> $GITHUB_PATH
+
+      - name: "Build the app with this wrapper"
+        env:
+          # Wrappers are found by searching this directory for a wrapper.yml.
+          STACK_REPO_BASE_DIR: ${{ github.workspace }}/repo-base-dir
+          STACK_SCRIPT_DEBUG: ${{ runner.debug }}
+        run: |
+          mkdir -p "$STACK_REPO_BASE_DIR"
+          cp -a "${{ github.workspace }}/wrapper" "$STACK_REPO_BASE_DIR/wrapper-under-test"
+          stack webapp build \
+            --source-repo "${{ github.workspace }}/app/frontend" \
+            --tag bozemanpass/webapp-base-test:ci
+
+      # An image that builds but does not serve is the failure mode that matters
+      # here: everything in this base image exists to run the app afterwards.
+      - name: "Check the container serves the built app"
+        run: |
+          set -e
+          container=$( docker run -d -p 3000:80 bozemanpass/webapp-base-test:ci )
+          for i in $( seq 1 20 ); do
+            body=$( curl -s http://localhost:3000 || true )
+            if echo "$body" | grep -q '/assets/index-'; then
+              echo "SERVE: PASSED"
+              docker stop "$container" > /dev/null
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "last response body was:"
+          echo "$body"
+          docker logs "$container"
+          docker stop "$container" > /dev/null
+          echo "SERVE: FAILED - the app was not served"
+          exit 1
